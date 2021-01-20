@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2020 Canonical, Ltd.
+ * Copyright (C) 2020-2021 Canonical, Ltd.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -201,21 +201,49 @@ mp::VMImage mp::LXDVMImageVault::fetch_image(const FetchType& fetch_type, const 
         // Image doesn't exist, so move on
     }
 
-    // TODO: Remove once we do support http & file based images
-    if (query.query_type != Query::Type::Alias)
-        throw std::runtime_error("http and file based images are not supported");
-
-    const auto info = info_for(query);
-    const auto id = info.id;
     VMImage source_image;
+    VMImageInfo info;
+    QString id;
 
-    source_image.id = id.toStdString();
-    source_image.original_release = info.release_title.toStdString();
-    source_image.release_date = info.version.toStdString();
-
-    for (const auto& alias : info.aliases)
+    if (query.query_type == Query::Type::Alias)
     {
-        source_image.aliases.push_back(alias.toStdString());
+        info = info_for(query);
+        id = info.id;
+
+        source_image.id = id.toStdString();
+        source_image.original_release = info.release_title.toStdString();
+        source_image.release_date = info.version.toStdString();
+
+        for (const auto& alias : info.aliases)
+        {
+            source_image.aliases.push_back(alias.toStdString());
+        }
+    }
+    else
+    {
+        QUrl image_url(QString::fromStdString(query.release));
+        QDateTime last_modified;
+
+        if (query.query_type == Query::Type::HttpDownload)
+        {
+            // Generate a sha256 hash based on the URL and use that for the id
+            id = QString(QCryptographicHash::hash(query.release.c_str(), QCryptographicHash::Sha256).toHex());
+            last_modified = url_downloader->last_modified(image_url);
+        }
+        else
+        {
+            if (!QFile::exists(image_url.path()))
+                throw std::runtime_error(fmt::format("Custom image `{}` does not exist.", image_url.path()));
+
+            source_image.image_path = image_url.path();
+            id = mp::vault::compute_image_hash(source_image.image_path);
+            last_modified = QDateTime::currentDateTime();
+        }
+
+        info = VMImageInfo{{}, {}, {}, {}, true, image_url.url(), {}, {}, id, {}, last_modified.toString(), 0, false};
+
+        source_image.id = id.toStdString();
+        source_image.release_date = last_modified.toString(Qt::ISODateWithMs).toStdString();
     }
 
     try
@@ -235,12 +263,20 @@ mp::VMImage mp::LXDVMImageVault::fetch_image(const FetchType& fetch_type, const 
         }
         else if (!info.image_location.isEmpty())
         {
-            // TODO: Need to make this async like in DefaultVMImageVault
+            QString image_path;
             QTemporaryDir lxd_import_dir{template_path};
 
-            auto image_path = lxd_import_dir.filePath(mp::vault::filename_for(info.image_location));
+            if (query.query_type != Query::Type::LocalFile)
+            {
+                // TODO: Need to make this async like in DefaultVMImageVault
+                image_path = lxd_import_dir.filePath(mp::vault::filename_for(info.image_location));
 
-            url_download_image(info, image_path, monitor);
+                url_download_image(info, image_path, monitor);
+            }
+            else
+            {
+                image_path = mp::vault::copy(source_image.image_path, lxd_import_dir.path());
+            }
 
             image_path = post_process_downloaded_image(image_path, monitor);
 
