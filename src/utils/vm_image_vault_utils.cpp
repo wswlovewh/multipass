@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2020 Canonical, Ltd.
+ * Copyright (C) 2020-2021 Canonical, Ltd.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -15,6 +15,7 @@
  *
  */
 
+#include <multipass/format.h>
 #include <multipass/vm_image_host.h>
 #include <multipass/vm_image_vault.h>
 #include <multipass/xz_image_decoder.h>
@@ -30,6 +31,21 @@ QString mp::vault::filename_for(const mp::Path& path)
 {
     QFileInfo file_info(path);
     return file_info.fileName();
+}
+
+QString mp::vault::copy(const QString& file_name, const QDir& output_dir)
+{
+    if (file_name.isEmpty())
+        return {};
+
+    if (!QFileInfo::exists(file_name))
+        throw std::runtime_error(fmt::format("{} missing", file_name));
+
+    QFileInfo info{file_name};
+    const auto source_name = info.fileName();
+    auto new_path = output_dir.filePath(source_name);
+    QFile::copy(file_name, new_path);
+    return new_path;
 }
 
 void mp::vault::delete_file(const mp::Path& path)

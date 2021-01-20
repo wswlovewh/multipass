@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2017-2020 Canonical, Ltd.
+ * Copyright (C) 2017-2021 Canonical, Ltd.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -23,6 +23,7 @@
 #include <multipass/path.h>
 #include <multipass/progress_monitor.h>
 
+#include <QDir>
 #include <QFile>
 #include <QString>
 
@@ -38,6 +39,7 @@ namespace vault
 {
 // Helper functions and classes for all image vault types
 QString filename_for(const Path& path);
+QString copy(const QString& file_name, const QDir& output_dir);
 void delete_file(const Path& path);
 QString compute_image_hash(const Path& image_path);
 void verify_image_download(const Path& image_path, const QString& image_hash);
