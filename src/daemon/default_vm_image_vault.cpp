@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2017-2020 Canonical, Ltd.
+ * Copyright (C) 2017-2021 Canonical, Ltd.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -167,21 +167,6 @@ std::unordered_map<std::string, mp::VaultRecord> load_db(const QString& db_name)
             last_accessed};
     }
     return reconstructed_records;
-}
-
-QString copy(const QString& file_name, const QDir& output_dir)
-{
-    if (file_name.isEmpty())
-        return {};
-
-    if (!QFileInfo::exists(file_name))
-        throw std::runtime_error(fmt::format("{} missing", file_name));
-
-    QFileInfo info{file_name};
-    const auto source_name = info.fileName();
-    auto new_path = output_dir.filePath(source_name);
-    QFile::copy(file_name, new_path);
-    return new_path;
 }
 
 void remove_source_images(const mp::VMImage& source_image, const mp::VMImage& prepared_image)
@@ -667,9 +652,9 @@ mp::VMImage mp::DefaultVMImageVault::image_instance_from(const std::string& inst
     auto name = QString::fromStdString(instance_name);
     auto output_dir = mp::utils::make_dir(instances_dir, name);
 
-    return {copy(prepared_image.image_path, output_dir),
-            copy(prepared_image.kernel_path, output_dir),
-            copy(prepared_image.initrd_path, output_dir),
+    return {mp::vault::copy(prepared_image.image_path, output_dir),
+            mp::vault::copy(prepared_image.kernel_path, output_dir),
+            mp::vault::copy(prepared_image.initrd_path, output_dir),
             prepared_image.id,
             prepared_image.original_release,
             prepared_image.current_release,
